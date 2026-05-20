@@ -9,12 +9,12 @@ ENVIRONMENT = "production"
 [[d1_databases]]
 binding = "DB_MEMCARE"
 database_name = "openclaw-memcare"
-database_id = "PLACEHOLDER_MEMCARE_DB_ID"
+database_id = "943932bc-653e-4fb5-88b6-4eff9895fcbc"
 
 [[d1_databases]]
 binding = "DB_GRAPH"
 database_name = "openclaw-graph"
-database_id = "PLACEHOLDER_GRAPH_DB_ID"
+database_id = "f60860bc-9808-4ade-989d-6840accbfc50"
 
 [observability]
 enabled = true
