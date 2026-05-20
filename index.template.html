@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MemCare — Memory Health Dashboard</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="favicon.png">
+<script>
+(function(){
+  var t=localStorage.getItem('memcare-theme');
+  if(!t) t=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark';
+  document.documentElement.setAttribute('data-theme',t);
+})();
+</script>
+<style>
+/* ============================================================
+   MemCare Dashboard — Deep purple/blue dark theme
+   Inspired by impeccable.style
+   ============================================================ */
+
+/* --- Reset & Base --- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* --- Dark theme (default) --- */
+:root, [data-theme="dark"] {
+  --bg-deep: #0a0a0f;
+  --bg-card: #13131f;
+  --bg-card-hover: #1a1a2e;
+  --border: rgba(108, 92, 231, 0.12);
+  --border-hover: rgba(108, 92, 231, 0.3);
+  --accent: #6c5ce7;
+  --accent-light: #a29bfe;
+  --cyan: #00cec9;
+  --yellow: #fdcb6e;
+  --orange: #e17055;
+  --green: #00b894;
+  --text-primary: #e8e6f0;
+  --text-secondary: #8b87a0;
+  --text-dim: #5a5672;
+  --radius: 16px;
+  --glow: 0 0 20px rgba(108, 92, 231, 0.06);
+  --glow-hover: 0 0 28px rgba(108, 92, 231, 0.12);
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  --grid-line: rgba(108, 92, 231, 0.06);
+  --chart-area-opacity: 0.25;
+  --tooltip-bg: #1e1e32;
+}
+/* --- Light theme --- */
+[data-theme="light"] {
+  --bg-deep: #f5f5f7;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f0f0f5;
+  --border: rgba(108, 92, 231, 0.10);
+  --border-hover: rgba(108, 92, 231, 0.25);
+  --accent: #5a4bd1;
+  --accent-light: #7c6fef;
+  --cyan: #00a8a3;
+  --yellow: #e5a800;
+  --orange: #d35400;
+  --green: #00966e;
+  --text-primary: #1a1a2e;
+  --text-secondary: #5c5a72;
+  --text-dim: #8a88a0;
+  --glow: 0 1px 3px rgba(0,0,0,0.06);
+  --glow-hover: 0 2px 8px rgba(0,0,0,0.10);
+  --grid-line: rgba(108, 92, 231, 0.08);
+  --chart-area-opacity: 0.15;
+  --tooltip-bg: #ffffff;
+}
+
+html { font-size: 16px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* --- Theme toggle button --- */
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, color 0.2s;
+  width: 36px;
+  height: 36px;
+}
+.theme-toggle:hover {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+.theme-toggle svg { display: block; }
+[data-theme="dark"] .icon-sun { display: none; }
+[data-theme="dark"] .icon-moon { display: block; }
+[data-theme="light"] .icon-sun { display: block; }
+[data-theme="light"] .icon-moon { display: none; }
+
+/* --- Layout --- */
+.dashboard {
+  position: relative;
+  z-index: 1;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+
+/* --- Header --- */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  animation: fadeSlideIn 0.6s ease-out both;
+}
+.header-left { display: flex; flex-direction: column; gap: 4px; }
+.header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+}
+.header .subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.last-updated {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: right;
+  line-height: 1.6;
+}
+
+/* --- Health Score Ring (Header) --- */
+.health-score-mini {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+}
+.health-score-mini svg { width: 56px; height: 56px; transform: rotate(-90deg); }
+.health-score-mini .score-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* --- Cards --- */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--glow);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: var(--border-hover);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--glow-hover);
+  transform: translateY(-2px);
+}
+.card:hover::before { opacity: 1; }
+
+.card-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+/* --- Grid Layout --- */
+.grid-row {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-1 { grid-template-columns: 1fr; }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+/* --- Metric Cards (Row 1) --- */
+.metric-value {
+  font-size: 2rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-bottom: 6px;
+}
+.metric-change {
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background: rgba(0,184,148,0.1);
+  color: var(--green);
+}
+.metric-change.negative {
+  background: rgba(225,112,85,0.1);
+  color: var(--orange);
+}
+.metric-change.neutral {
+  background: rgba(139,135,160,0.1);
+  color: var(--text-secondary);
+}
+.metric-sub {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* --- Chart Cards --- */
+.chart-container {
+  width: 100%;
+  position: relative;
+}
+.chart-container svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* --- Donut Chart --- */
+.donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.donut-svg-wrap {
+  flex-shrink: 0;
+  width: 160px;
+  height: 160px;
+}
+.donut-svg-wrap svg {
+  width: 160px;
+  height: 160px;
+}
+.donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.legend-value {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.72rem;
+}
+
+/* --- Bar Chart --- */
+.bar-group text { font-family: var(--font-mono); }
+
+/* --- Storage bars --- */
+.storage-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.storage-label {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  width: 70px;
+  flex-shrink: 0;
+}
+.storage-track {
+  flex: 1;
+  height: 24px;
+  background: var(--grid-line);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+.storage-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+}
+.storage-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 60%, rgba(255,255,255,0.08));
+  border-radius: 6px;
+}
+.storage-amount {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  width: 65px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* --- System Status (Row 4) --- */
+.status-section { display: flex; flex-direction: column; gap: 16px; }
+.status-item { display: flex; flex-direction: column; gap: 6px; }
+.status-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+.progress-track {
+  width: 100%;
+  height: 8px;
+  background: var(--grid-line);
+  border-radius: 100px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 100px;
+  transition: width 1.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.status-value {
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.status-detail {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+/* --- Footer --- */
+.footer {
+  text-align: center;
+  padding-top: 32px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  animation: fadeSlideIn 0.6s ease-out 0.8s both;
+}
+
+/* --- Animations --- */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes drawLine {
+  from { stroke-dashoffset: var(--path-length); }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes fadeAreaIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ringDraw {
+  from { stroke-dashoffset: var(--ring-circumference); }
+  to { stroke-dashoffset: var(--ring-target); }
+}
+@keyframes glowPulse {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(108,92,231,0.3)); }
+  50% { filter: drop-shadow(0 0 8px rgba(108,92,231,0.5)); }
+}
+
+.card { animation: fadeSlideIn 0.5s ease-out both; }
+.grid-row:nth-child(2) .card:nth-child(1) { animation-delay: 0.1s; }
+.grid-row:nth-child(2) .card:nth-child(2) { animation-delay: 0.15s; }
+.grid-row:nth-child(2) .card:nth-child(3) { animation-delay: 0.2s; }
+.grid-row:nth-child(2) .card:nth-child(4) { animation-delay: 0.25s; }
+.grid-row:nth-child(3) .card:nth-child(1) { animation-delay: 0.3s; }
+.grid-row:nth-child(3) .card:nth-child(2) { animation-delay: 0.35s; }
+.grid-row:nth-child(4) .card:nth-child(1) { animation-delay: 0.4s; }
+.grid-row:nth-child(4) .card:nth-child(2) { animation-delay: 0.45s; }
+.grid-row:nth-child(5) .card:nth-child(1) { animation-delay: 0.5s; }
+.grid-row:nth-child(5) .card:nth-child(2) { animation-delay: 0.55s; }
+.grid-row:nth-child(5) .card:nth-child(3) { animation-delay: 0.6s; }
+
+/* --- Tooltip --- */
+.svg-tooltip {
+  position: absolute;
+  background: var(--tooltip-bg);
+  border: 1px solid var(--border-hover);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+/* --- Responsive --- */
+@media (max-width: 1024px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .dashboard { padding: 16px 12px 32px; }
+  .header { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .header-right { width: 100%; justify-content: space-between; }
+  .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
+  .donut-wrap { flex-direction: column; align-items: center; }
+  .donut-legend { flex-direction: row; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .metric-value { font-size: 1.6rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="dashboard">
+
+  <!-- ======== HEADER ======== -->
+  <div class="header">
+    <div class="header-left">
+      <h1>MemCare</h1>
+      <span class="subtitle">Memory Health Dashboard</span>
+    </div>
+    <div class="header-right">
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
+      <div class="last-updated" id="lastUpdated"></div>
+      <div class="health-score-mini" id="healthScoreMini" title="Memory Health Score — weighted from log completeness, graph growth, LanceDB health, distill freshness & disk usage">
+        <svg viewBox="0 0 56 56">
+          <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(108,92,231,0.12)" stroke-width="5"/>
+          <circle id="healthRing" cx="28" cy="28" r="22" fill="none" stroke="var(--accent)" stroke-width="5"
+            stroke-linecap="round"
+            stroke-dasharray="138.23"
+            stroke-dashoffset="138.23"
+            style="--ring-circumference:138.23; transition: stroke-dashoffset 1.5s cubic-bezier(0.22,1,0.36,1), stroke 0.3s ease;"/>
+        </svg>
+        <div class="score-label" id="healthScoreLabel">--</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== ROW 1 — Core Metrics ======== -->
+  <div class="grid-row grid-4" id="metricsRow"></div>
+
+  <!-- ======== ROW 2 — Activity Wave + Entity Distribution ======== -->
+  <div class="grid-row grid-2">
+    <div class="card">
+      <div class="card-title">7-Day Activity Wave</div>
+      <div class="chart-container" id="activityChart"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Entity Type Distribution</div>
+      <div class="donut-wrap" id="donutChart"></div>
+    </div>
+  </div>
+
+  <!-- ======== ROW 3 — Knowledge Growth + Storage ======== -->
+  <div class="grid-row grid-2">
+    <div class="card">
+      <div class="card-title">Knowledge Growth (7 Days)</div>
+      <div class="chart-container" id="growthChart"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Storage Overview</div>
+      <div id="storageChart"></div>
+    </div>
+  </div>
+
+  <!-- ======== ROW 4 — System Status ======== -->
+  <div class="grid-row grid-3" id="statusRow"></div>
+
+  <!-- ======== ROW 5 — Search Telemetry ======== -->
+  <div class="grid-row grid-2">
+    <div class="card">
+      <div class="card-title">Search Telemetry (yesterday)</div>
+      <div id="searchStats" style="padding:8px 4px;"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Recent Search Misses</div>
+      <div id="searchMisses" style="padding:4px;font-size:0.78rem;line-height:1.6;"></div>
+    </div>
+  </div>
+
+  <!-- ======== ROW 6 — Important Topics ======== -->
+  <div class="grid-row grid-1">
+    <div class="card">
+      <div class="card-title">Important Topics <span style="color:var(--text-dim);font-weight:400;font-size:0.72rem;margin-left:8px;">imp ≥ 0.85, or ≥ 0.8 within 14d — top 50</span></div>
+      <div id="importantTopics" style="padding:4px;font-size:0.82rem;line-height:1.55;max-height:520px;overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <!-- ======== FOOTER ======== -->
+  <div class="footer">
+    Cindy's Memory &middot; Updated daily at 04:00 CST
+    <a href="/__auth/logout" style="margin-left:12px;color:var(--text-dim);font-size:0.72rem;text-decoration:none;border-bottom:1px solid var(--text-dim);">logout</a>
+  </div>
+
+</div>
+
+<script>
+// === DATA (injected by build.sh) ===
+window.__MEMCARE_DATA__ = {{DATA_PLACEHOLDER}};
+
+(function() {
+  'use strict';
+
+  const RAW = window.__MEMCARE_DATA__;
+  // DATA has shape {days:[...], latest:{...}}
+  const allDays = (RAW.days || []).sort((a, b) => (a.date||'').localeCompare(b.date||''));
+  const latest = RAW.latest && RAW.latest.date ? RAW.latest : allDays[allDays.length - 1] || {};
+  const trend = latest.trend || [];
+
+  // ============================================================
+  // Utility functions
+  // ============================================================
+  function fmt(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return n.toLocaleString();
+    return String(n);
+  }
+  function fmtBytes(b) {
+    if (b >= 1e9) return (b / (1024*1024*1024)).toFixed(1) + ' GB';
+    if (b >= 1e6) return (b / (1024*1024)).toFixed(1) + ' MB';
+    if (b >= 1e3) return (b / 1024).toFixed(1) + ' KB';
+    return b + ' B';
+  }
+  function shortDate(d) { return d.slice(5); } // "04-07"
+  function dayLabel(d) {
+    var parts = d.split('-');
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[parseInt(parts[1],10)-1] + ' ' + parseInt(parts[2],10);
+  }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  // ============================================================
+  // Health Score Calculation
+  // ============================================================
+  function computeHealthScore() {
+    var scores = [];
+
+    // 1. Log completeness: entries today vs 7-day avg
+    var logEntries = latest.dailyLog.entries || 0;
+    var avgEntries = trend.length > 0
+      ? trend.reduce(function(s,t){ return s + t.logEntries; }, 0) / trend.length
+      : logEntries;
+    var logScore = avgEntries > 0 ? clamp(logEntries / Math.max(avgEntries, 1) * 80, 0, 100) : 0;
+    if (latest.dailyLog.exists && logEntries >= 10) logScore = Math.max(logScore, 60);
+    scores.push({ name: 'Log Completeness', value: logScore, weight: 0.2 });
+
+    // 2. Graph growth: any new entities/relations in last 7 days?
+    var totalNew = allDays.reduce(function(s,d){
+      return s + (d.graph.newEntities || 0) + (d.graph.newRelations || 0);
+    }, 0);
+    var graphScore = totalNew > 0 ? clamp(50 + totalNew * 0.5, 50, 100) : 30;
+    if (latest.graph.entities > 1000) graphScore = Math.max(graphScore, 60);
+    scores.push({ name: 'Graph Growth', value: graphScore, weight: 0.25 });
+
+    // 3. LanceDB health: exists + files count
+    var lanceScore = 0;
+    if (latest.lancedb.exists) {
+      lanceScore = 70;
+      if (latest.lancedb.files > 1000) lanceScore = 85;
+      if (latest.lancedb.files > 5000) lanceScore = 95;
+    }
+    scores.push({ name: 'LanceDB Health', value: lanceScore, weight: 0.2 });
+
+    // 4. Distill freshness: how recently were topics/projects updated?
+    var now = Date.now() / 1000;
+    var topicAge = now - (latest.distilled.topicsLastModified || 0);
+    var projAge = now - (latest.distilled.projectsLastModified || 0);
+    var maxAge = Math.max(topicAge, projAge);
+    var distillScore = 100;
+    if (maxAge > 7 * 86400) distillScore = 70;
+    if (maxAge > 30 * 86400) distillScore = 40;
+    if (maxAge > 90 * 86400) distillScore = 20;
+    if (latest.distilled.topicsCount + latest.distilled.projectsCount > 20) {
+      distillScore = Math.max(distillScore, 60);
+    }
+    scores.push({ name: 'Distill Freshness', value: distillScore, weight: 0.2 });
+
+    // 5. Disk usage: lower is better
+    var diskPct = latest.system.diskUsagePercent || 0;
+    var diskScore = 100 - diskPct;
+    if (diskPct > 90) diskScore = 10;
+    else if (diskPct > 80) diskScore = 30;
+    else if (diskPct > 60) diskScore = 60;
+    scores.push({ name: 'Disk Usage', value: diskScore, weight: 0.15 });
+
+    var total = scores.reduce(function(s, sc) { return s + sc.value * sc.weight; }, 0);
+    return Math.round(total);
+  }
+
+  var healthScore = computeHealthScore();
+
+  // ============================================================
+  // Render: Header
+  // ============================================================
+  var dateStr = latest.date;
+  var collected = latest.collectedAt ? new Date(latest.collectedAt) : null;
+  document.getElementById('lastUpdated').innerHTML =
+    'Report for<br>' +
+    new Date(latest.date + 'T00:00:00').toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) +
+    (collected ? '<br><span style="opacity:0.5;font-size:0.75rem">collected ' + collected.toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'}) + '</span>' : '');
+
+  // Health ring
+  var circumference = 138.23;
+  var offset = circumference - (circumference * healthScore / 100);
+  var ring = document.getElementById('healthRing');
+  var ringColor = healthScore >= 80 ? 'var(--green)' : healthScore >= 60 ? 'var(--accent)' : healthScore >= 40 ? 'var(--yellow)' : 'var(--orange)';
+  setTimeout(function() {
+    ring.style.strokeDashoffset = offset;
+    ring.style.stroke = ringColor;
+  }, 300);
+  // Animate score number
+  animateNumber(document.getElementById('healthScoreLabel'), 0, healthScore, 1200, '');
+
+  // ============================================================
+  // Render: Metric Cards (Row 1)
+  // ============================================================
+  var metricsRow = document.getElementById('metricsRow');
+  var metrics = [
+    {
+      title: 'Entities',
+      value: latest.graph.entities,
+      change: latest.graph.newEntities,
+      changeLabel: 'new on ' + latest.date,
+      sub: fmt(latest.graph.relations) + ' relations'
+    },
+    {
+      title: 'Relations',
+      value: latest.graph.relations,
+      change: latest.graph.newRelations,
+      changeLabel: 'new on ' + latest.date,
+      sub: fmtBytes(latest.graph.sizeBytes) + ' graph size'
+    },
+    {
+      title: 'Daily Entries',
+      value: latest.dailyLog.entries,
+      change: latest.dailyLog.entries - (latest.dailyLog.yesterdayEntries || 0),
+      changeLabel: 'vs prev day',
+      sub: latest.dailyLog.totalLogs + ' total logs'
+    },
+    {
+      title: 'LanceDB',
+      value: fmtBytes(latest.lancedb.sizeBytes),
+      rawValue: null,
+      change: null,
+      sub: fmt(latest.lancedb.files) + ' files'
+    }
+  ];
+  metrics.forEach(function(m, i) {
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.style.animationDelay = (0.08 + i * 0.06) + 's';
+
+    var changeHTML = '';
+    if (m.change !== null && m.change !== undefined) {
+      var cls = m.change > 0 ? '' : m.change < 0 ? 'negative' : 'neutral';
+      var arrow = m.change > 0 ? '&#9650; ' : m.change < 0 ? '&#9660; ' : '';
+      var sign = m.change > 0 ? '+' : '';
+      changeHTML = '<span class="metric-change ' + cls + '">' + arrow + sign + m.change + ' ' + m.changeLabel + '</span>';
+    }
+    var valueId = 'metric-' + i;
+    var displayValue = m.rawValue === null && typeof m.value === 'string' ? m.value : fmt(m.value);
+    card.innerHTML =
+      '<div class="card-title">' + m.title + '</div>' +
+      '<div class="metric-value" id="' + valueId + '">' + displayValue + '</div>' +
+      changeHTML +
+      '<div class="metric-sub">' + m.sub + '</div>';
+    metricsRow.appendChild(card);
+
+    // Animate numbers
+    if (typeof m.value === 'number') {
+      animateNumber(document.getElementById(valueId), 0, m.value, 1400, '', true);
+    }
+  });
+
+  // ============================================================
+  // Render: 7-Day Activity Wave (Area Chart)
+  // ============================================================
+  (function() {
+    var container = document.getElementById('activityChart');
+    var W = 520, H = 200, padL = 40, padR = 16, padT = 16, padB = 36;
+    var chartW = W - padL - padR;
+    var chartH = H - padT - padB;
+
+    var entries = trend.map(function(t) { return t.logEntries; });
+    var maxVal = Math.max.apply(null, entries) * 1.15;
+    if (maxVal === 0) maxVal = 1;
+    var n = entries.length;
+
+    // Build smooth curve control points
+    function getY(v) { return padT + chartH - (v / maxVal) * chartH; }
+    function getX(i) { return padL + (i / (n - 1)) * chartW; }
+
+    // Create SVG path for smooth curve
+    var points = entries.map(function(v, i) { return { x: getX(i), y: getY(v) }; });
+
+    // Catmull-Rom to Bezier conversion for smooth curves
+    function catmullRomToBezier(pts) {
+      var path = 'M' + pts[0].x.toFixed(1) + ',' + pts[0].y.toFixed(1);
+      for (var i = 0; i < pts.length - 1; i++) {
+        var p0 = pts[Math.max(0, i - 1)];
+        var p1 = pts[i];
+        var p2 = pts[i + 1];
+        var p3 = pts[Math.min(pts.length - 1, i + 2)];
+        var tension = 0.3;
+        var cp1x = p1.x + (p2.x - p0.x) * tension;
+        var cp1y = p1.y + (p2.y - p0.y) * tension;
+        var cp2x = p2.x - (p3.x - p1.x) * tension;
+        var cp2y = p2.y - (p3.y - p1.y) * tension;
+        path += ' C' + cp1x.toFixed(1) + ',' + cp1y.toFixed(1) + ' ' +
+          cp2x.toFixed(1) + ',' + cp2y.toFixed(1) + ' ' +
+          p2.x.toFixed(1) + ',' + p2.y.toFixed(1);
+      }
+      return path;
+    }
+
+    var curvePath = catmullRomToBezier(points);
+    var areaPath = curvePath +
+      ' L' + points[points.length - 1].x.toFixed(1) + ',' + (padT + chartH) +
+      ' L' + points[0].x.toFixed(1) + ',' + (padT + chartH) + ' Z';
+
+    // Y-axis gridlines
+    var gridLines = '';
+    var yLabels = '';
+    var steps = 4;
+    for (var g = 0; g <= steps; g++) {
+      var val = Math.round((maxVal / steps) * g);
+      var y = getY(val);
+      gridLines += '<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + y.toFixed(1) + '" style="stroke:var(--grid-line)" stroke-width="1"/>';
+      yLabels += '<text x="' + (padL - 8) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="end" fill="' + 'var(--text-dim)' + '" font-size="10" font-family="var(--font-mono)">' + val + '</text>';
+    }
+
+    // X-axis labels
+    var xLabels = '';
+    trend.forEach(function(t, i) {
+      xLabels += '<text x="' + getX(i).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--text-dim)" font-size="10" font-family="var(--font-mono)">' + dayLabel(t.date) + '</text>';
+    });
+
+    // Data point dots
+    var dots = '';
+    points.forEach(function(p, i) {
+      dots += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="4" fill="var(--accent)" stroke="var(--bg-card)" stroke-width="2" class="wave-dot" data-idx="' + i + '">' +
+        '<animate attributeName="r" from="0" to="4" dur="0.4s" begin="' + (0.8 + i * 0.08) + 's" fill="freeze"/>' +
+        '</circle>';
+    });
+
+    var gradientId = 'waveGrad';
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">' +
+      '<defs>' +
+        '<linearGradient id="' + gradientId + '" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0%" stop-color="var(--accent)" stop-opacity="0.3"/>' +
+          '<stop offset="100%" stop-color="var(--accent)" stop-opacity="0.02"/>' +
+        '</linearGradient>' +
+      '</defs>' +
+      gridLines + yLabels + xLabels +
+      '<path d="' + areaPath + '" fill="url(#' + gradientId + ')" opacity="0">' +
+        '<animate attributeName="opacity" from="0" to="1" dur="0.8s" begin="0.5s" fill="freeze"/>' +
+      '</path>' +
+      '<path d="' + curvePath + '" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" opacity="0">' +
+        '<animate attributeName="opacity" from="0" to="1" dur="0.6s" begin="0.4s" fill="freeze"/>' +
+      '</path>' +
+      dots +
+      '</svg>';
+
+    // Tooltip overlay
+    container.innerHTML = svg + '<div class="svg-tooltip" id="waveTip"></div>';
+
+    // Tooltip interactivity
+    var tip = document.getElementById('waveTip');
+    container.querySelectorAll('.wave-dot').forEach(function(dot) {
+      dot.addEventListener('mouseenter', function(e) {
+        var idx = parseInt(this.getAttribute('data-idx'));
+        tip.textContent = dayLabel(trend[idx].date) + ': ' + trend[idx].logEntries + ' entries';
+        tip.style.opacity = '1';
+        var rect = container.getBoundingClientRect();
+        tip.style.left = (parseFloat(this.getAttribute('cx')) / W * rect.width - 40) + 'px';
+        tip.style.top = (parseFloat(this.getAttribute('cy')) / H * rect.height - 32) + 'px';
+      });
+      dot.addEventListener('mouseleave', function() { tip.style.opacity = '0'; });
+    });
+  })();
+
+  // ============================================================
+  // Render: Entity Type Distribution (Donut Chart)
+  // ============================================================
+  (function() {
+    var container = document.getElementById('donutChart');
+    var dist = latest.graph.typeDistribution || {};
+    var sorted = Object.entries(dist).sort(function(a,b){ return b[1] - a[1]; });
+    var total = sorted.reduce(function(s, e) { return s + e[1]; }, 0);
+
+    var colors = ['#6c5ce7','#a29bfe','#00cec9','#81ecec','#fdcb6e','#e17055','#00b894','#55efc4','#fd79a8','#636e72'];
+    var cx = 80, cy = 80, R = 62, r = 42;
+    var slices = '';
+    var angle = -90;
+
+    sorted.forEach(function(entry, i) {
+      var val = entry[1];
+      var pct = val / total;
+      var sweep = pct * 360;
+      var startAngle = angle * Math.PI / 180;
+      var endAngle = (angle + sweep) * Math.PI / 180;
+
+      var x1 = cx + R * Math.cos(startAngle);
+      var y1 = cy + R * Math.sin(startAngle);
+      var x2 = cx + R * Math.cos(endAngle);
+      var y2 = cy + R * Math.sin(endAngle);
+      var ix1 = cx + r * Math.cos(endAngle);
+      var iy1 = cy + r * Math.sin(endAngle);
+      var ix2 = cx + r * Math.cos(startAngle);
+      var iy2 = cy + r * Math.sin(startAngle);
+
+      var largeArc = sweep > 180 ? 1 : 0;
+      var color = colors[i % colors.length];
+
+      slices += '<path d="M' + x1.toFixed(2) + ',' + y1.toFixed(2) +
+        ' A' + R + ',' + R + ' 0 ' + largeArc + ' 1 ' + x2.toFixed(2) + ',' + y2.toFixed(2) +
+        ' L' + ix1.toFixed(2) + ',' + iy1.toFixed(2) +
+        ' A' + r + ',' + r + ' 0 ' + largeArc + ' 0 ' + ix2.toFixed(2) + ',' + iy2.toFixed(2) +
+        ' Z" fill="' + color + '" opacity="0" style="transition: opacity 0.15s ease, filter 0.2s ease; cursor: pointer;">' +
+        '<animate attributeName="opacity" from="0" to="0.85" dur="0.5s" begin="' + (0.4 + i * 0.06) + 's" fill="freeze"/>' +
+        '</path>';
+
+      angle += sweep;
+    });
+
+    var svgHTML = '<div class="donut-svg-wrap"><svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">' +
+      slices +
+      '<text x="80" y="76" text-anchor="middle" fill="var(--text-primary)" font-size="18" font-weight="700" font-family="var(--font-mono)">' + fmt(total) + '</text>' +
+      '<text x="80" y="92" text-anchor="middle" fill="var(--text-secondary)" font-size="9">total entities</text>' +
+      '</svg></div>';
+
+    // Legend — show top 8
+    var legendHTML = '<div class="donut-legend">';
+    var showCount = Math.min(sorted.length, 8);
+    for (var i = 0; i < showCount; i++) {
+      var name = sorted[i][0];
+      var val = sorted[i][1];
+      var pct = ((val / total) * 100).toFixed(1);
+      legendHTML += '<div class="legend-item">' +
+        '<span class="legend-dot" style="background:' + colors[i % colors.length] + '"></span>' +
+        '<span>' + name + '</span>' +
+        '<span class="legend-value">' + fmt(val) + ' <span style="color:var(--text-dim);font-weight:400">(' + pct + '%)</span></span>' +
+        '</div>';
+    }
+    if (sorted.length > showCount) {
+      var otherVal = sorted.slice(showCount).reduce(function(s,e){ return s + e[1]; }, 0);
+      legendHTML += '<div class="legend-item">' +
+        '<span class="legend-dot" style="background:var(--text-dim)"></span>' +
+        '<span>others</span>' +
+        '<span class="legend-value">' + fmt(otherVal) + '</span>' +
+        '</div>';
+    }
+    legendHTML += '</div>';
+
+    container.innerHTML = svgHTML + legendHTML;
+
+    // Hover glow on slices
+    container.querySelectorAll('path').forEach(function(path) {
+      path.addEventListener('mouseenter', function() {
+        this.style.filter = 'brightness(1.3) drop-shadow(0 0 6px rgba(108,92,231,0.4))';
+        this.style.opacity = '1';
+      });
+      path.addEventListener('mouseleave', function() {
+        this.style.filter = '';
+        this.style.opacity = '0.85';
+      });
+    });
+  })();
+
+  // ============================================================
+  // Render: Knowledge Growth (Bar Chart)
+  // ============================================================
+  (function() {
+    var container = document.getElementById('growthChart');
+    var W = 520, H = 220, padL = 48, padR = 16, padT = 16, padB = 40;
+    var chartW = W - padL - padR;
+    var chartH = H - padT - padB;
+
+    // Compute per-day new entities + relations
+    var barData = [];
+    for (var i = 0; i < allDays.length; i++) {
+      var d = allDays[i];
+      barData.push({
+        date: d.date,
+        entities: d.graph.newEntities || 0,
+        relations: d.graph.newRelations || 0
+      });
+    }
+    // Use last 7
+    barData = barData.slice(-7);
+
+    var maxBar = Math.max.apply(null, barData.map(function(b) { return b.entities + b.relations; }));
+    if (maxBar === 0) maxBar = 10; // avoid division by zero
+
+    var barGroupW = chartW / barData.length;
+    var barW = Math.min(barGroupW * 0.35, 24);
+    var gap = 3;
+
+    var gridLines = '';
+    var yLabels = '';
+    var ySteps = 4;
+    for (var g = 0; g <= ySteps; g++) {
+      var val = Math.round((maxBar / ySteps) * g);
+      var y = padT + chartH - (val / maxBar) * chartH;
+      gridLines += '<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + y.toFixed(1) + '" style="stroke:var(--grid-line)" stroke-width="1"/>';
+      yLabels += '<text x="' + (padL - 8) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="end" fill="var(--text-dim)" font-size="10" font-family="var(--font-mono)">' + val + '</text>';
+    }
+
+    var bars = '';
+    var xLabels = '';
+    barData.forEach(function(b, i) {
+      var cx = padL + barGroupW * i + barGroupW / 2;
+      var eH = (b.entities / maxBar) * chartH;
+      var rH = (b.relations / maxBar) * chartH;
+
+      // Entities bar
+      bars += '<rect x="' + (cx - barW - gap/2).toFixed(1) + '" y="' + (padT + chartH - eH).toFixed(1) + '" width="' + barW + '" height="0" rx="3" fill="var(--accent)" opacity="0.85">' +
+        '<animate attributeName="height" from="0" to="' + eH.toFixed(1) + '" dur="0.6s" begin="' + (0.3 + i * 0.08) + 's" fill="freeze"/>' +
+        '<animate attributeName="y" from="' + (padT + chartH) + '" to="' + (padT + chartH - eH).toFixed(1) + '" dur="0.6s" begin="' + (0.3 + i * 0.08) + 's" fill="freeze"/>' +
+        '<animate attributeName="opacity" from="0" to="0.85" dur="0.4s" begin="' + (0.3 + i * 0.08) + 's" fill="freeze"/>' +
+        '</rect>';
+
+      // Relations bar
+      bars += '<rect x="' + (cx + gap/2).toFixed(1) + '" y="' + (padT + chartH - rH).toFixed(1) + '" width="' + barW + '" height="0" rx="3" fill="var(--cyan)" opacity="0.85">' +
+        '<animate attributeName="height" from="0" to="' + rH.toFixed(1) + '" dur="0.6s" begin="' + (0.35 + i * 0.08) + 's" fill="freeze"/>' +
+        '<animate attributeName="y" from="' + (padT + chartH) + '" to="' + (padT + chartH - rH).toFixed(1) + '" dur="0.6s" begin="' + (0.35 + i * 0.08) + 's" fill="freeze"/>' +
+        '<animate attributeName="opacity" from="0" to="0.85" dur="0.4s" begin="' + (0.35 + i * 0.08) + 's" fill="freeze"/>' +
+        '</rect>';
+
+      // X label
+      xLabels += '<text x="' + cx.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--text-dim)" font-size="10" font-family="var(--font-mono)">' + dayLabel(b.date) + '</text>';
+    });
+
+    // Legend
+    var legend = '<g transform="translate(' + (W - padR - 140) + ',' + (padT + 4) + ')">' +
+      '<rect x="0" y="0" width="10" height="10" rx="2" fill="var(--accent)" opacity="0.85"/>' +
+      '<text x="14" y="9" fill="var(--text-secondary)" font-size="10">Entities</text>' +
+      '<rect x="70" y="0" width="10" height="10" rx="2" fill="var(--cyan)" opacity="0.85"/>' +
+      '<text x="84" y="9" fill="var(--text-secondary)" font-size="10">Relations</text>' +
+      '</g>';
+
+    container.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">' +
+      gridLines + yLabels + xLabels + bars + legend + '</svg>';
+  })();
+
+  // ============================================================
+  // Render: Storage Overview (Horizontal Bars)
+  // ============================================================
+  (function() {
+    var container = document.getElementById('storageChart');
+    var storageItems = [
+      { label: 'LanceDB', bytes: latest.lancedb.sizeBytes, color: 'var(--accent)' },
+      { label: 'Graph', bytes: latest.graph.sizeBytes, color: 'var(--cyan)' },
+      { label: 'Projects', bytes: latest.distilled.projectsSizeBytes, color: 'var(--green)' },
+      { label: 'Topics', bytes: latest.distilled.topicsSizeBytes, color: 'var(--yellow)' }
+    ];
+    var maxBytes = Math.max.apply(null, storageItems.map(function(s) { return s.bytes; }));
+
+    var html = '';
+    storageItems.forEach(function(item, i) {
+      var pct = (item.bytes / maxBytes) * 100;
+      html += '<div class="storage-bar-row">' +
+        '<span class="storage-label">' + item.label + '</span>' +
+        '<div class="storage-track">' +
+          '<div class="storage-fill" style="width: 0%; background: ' + item.color + ';" data-target="' + pct + '"></div>' +
+        '</div>' +
+        '<span class="storage-amount">' + fmtBytes(item.bytes) + '</span>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+
+    // Animate bar widths
+    setTimeout(function() {
+      container.querySelectorAll('.storage-fill').forEach(function(fill) {
+        fill.style.width = fill.getAttribute('data-target') + '%';
+      });
+    }, 500);
+  })();
+
+  // ============================================================
+  // Render: System Status (Row 4)
+  // ============================================================
+  (function() {
+    var row = document.getElementById('statusRow');
+
+    // 1. Disk Usage
+    var diskPct = latest.system.diskUsagePercent;
+    var diskColor = diskPct < 60 ? 'var(--green)' : diskPct < 80 ? 'var(--yellow)' : 'var(--orange)';
+    var card1 = document.createElement('div');
+    card1.className = 'card';
+    card1.innerHTML = '<div class="card-title">Disk Usage</div>' +
+      '<div class="status-section">' +
+        '<div class="status-item">' +
+          '<div class="progress-track"><div class="progress-fill" style="width:0%;background:' + diskColor + ';" data-target="' + diskPct + '"></div></div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:baseline;">' +
+            '<span class="status-value" style="color:' + diskColor + '">' + diskPct + '%</span>' +
+            '<span class="status-detail">' + fmtBytes(latest.system.memoryDirSizeBytes) + ' memory dir</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    row.appendChild(card1);
+
+    // 2. Distilled Coverage
+    var card2 = document.createElement('div');
+    card2.className = 'card';
+    var topicsDate = latest.distilled.topicsLastModified ? new Date(latest.distilled.topicsLastModified * 1000) : null;
+    var projDate = latest.distilled.projectsLastModified ? new Date(latest.distilled.projectsLastModified * 1000) : null;
+    var lastMod = topicsDate
+      ? topicsDate.toLocaleDateString('en-US', {month:'short',day:'numeric'})
+      : 'N/A';
+    card2.innerHTML = '<div class="card-title">Distilled Coverage</div>' +
+      '<div class="status-section">' +
+        '<div style="display:flex;gap:24px;">' +
+          '<div>' +
+            '<div class="status-value" style="color:var(--cyan)">' + latest.distilled.topicsCount + '</div>' +
+            '<div class="status-detail">topics (' + fmtBytes(latest.distilled.topicsSizeBytes) + ')</div>' +
+          '</div>' +
+          '<div>' +
+            '<div class="status-value" style="color:var(--accent-light)">' + latest.distilled.projectsCount + '</div>' +
+            '<div class="status-detail">projects (' + fmtBytes(latest.distilled.projectsSizeBytes) + ')</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="status-detail" style="margin-top:8px;">Last updated: ' + lastMod + '</div>' +
+      '</div>';
+    row.appendChild(card2);
+
+    // 3. Log Continuity
+    var card3 = document.createElement('div');
+    card3.className = 'card';
+    var totalDays = allDays.length;
+    var daysWithLogs = allDays.filter(function(d){ return d.dailyLog.exists && d.dailyLog.entries > 0; }).length;
+    var streak = 0;
+    for (var i = allDays.length - 1; i >= 0; i--) {
+      if (allDays[i].dailyLog.exists && allDays[i].dailyLog.entries > 0) streak++;
+      else break;
+    }
+    var continuityPct = totalDays > 0 ? Math.round((daysWithLogs / totalDays) * 100) : 0;
+    card3.innerHTML = '<div class="card-title">Log Continuity</div>' +
+      '<div class="status-section">' +
+        '<div style="display:flex;gap:24px;align-items:baseline;">' +
+          '<div>' +
+            '<div class="status-value" style="color:var(--green)">' + streak + ' days</div>' +
+            '<div class="status-detail">current streak</div>' +
+          '</div>' +
+          '<div>' +
+            '<div class="status-value">' + continuityPct + '%</div>' +
+            '<div class="status-detail">' + daysWithLogs + '/' + totalDays + ' days covered</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="progress-track" style="margin-top:8px;"><div class="progress-fill" style="width:0%;background:var(--green);" data-target="' + continuityPct + '"></div></div>' +
+      '</div>';
+    row.appendChild(card3);
+
+    // Animate progress bars
+    setTimeout(function() {
+      row.querySelectorAll('.progress-fill').forEach(function(fill) {
+        fill.style.width = fill.getAttribute('data-target') + '%';
+      });
+    }, 600);
+  })();
+
+  // ============================================================
+  // Render: Search Telemetry (Row 5)
+  // ============================================================
+  (function() {
+    var s = latest.search || {total:0,hits:0,misses:0,hitRate:0,tierHits:{graph:0,grep:0,vector:0},recentMisses:[]};
+    var statsEl = document.getElementById('searchStats');
+    var hitColor = s.total === 0 ? 'var(--text-dim)' : (s.hitRate >= 0.7 ? 'var(--green)' : s.hitRate >= 0.4 ? 'var(--yellow)' : 'var(--orange)');
+    var hitPct = Math.round((s.hitRate || 0) * 100);
+    statsEl.innerHTML =
+      '<div style="display:flex;gap:32px;align-items:baseline;flex-wrap:wrap;">' +
+        '<div><div class="status-value" style="color:var(--accent)">' + s.total + '</div><div class="status-detail">searches</div></div>' +
+        '<div><div class="status-value" style="color:var(--green)">' + s.hits + '</div><div class="status-detail">hits</div></div>' +
+        '<div><div class="status-value" style="color:var(--orange)">' + s.misses + '</div><div class="status-detail">misses</div></div>' +
+        '<div><div class="status-value" style="color:' + hitColor + '">' + hitPct + '%</div><div class="status-detail">hit rate</div></div>' +
+      '</div>' +
+      '<div class="progress-track" style="margin-top:12px;"><div class="progress-fill" style="width:0%;background:' + hitColor + ';" data-target="' + hitPct + '"></div></div>' +
+      '<div style="margin-top:14px;display:flex;gap:18px;font-size:0.78rem;">' +
+        '<span><span style="color:var(--cyan)">graph</span> ' + s.tierHits.graph + '</span>' +
+        '<span><span style="color:var(--accent-light)">grep</span> ' + s.tierHits.grep + '</span>' +
+        '<span><span style="color:var(--accent)">vector</span> ' + s.tierHits.vector + '</span>' +
+      '</div>';
+    setTimeout(function() {
+      statsEl.querySelectorAll('.progress-fill').forEach(function(fill) {
+        fill.style.width = fill.getAttribute('data-target') + '%';
+      });
+    }, 600);
+
+    var missEl = document.getElementById('searchMisses');
+    if (!s.recentMisses || s.recentMisses.length === 0) {
+      missEl.innerHTML = '<div style="color:var(--text-dim);padding:12px 0;">No misses today — every query found something.</div>';
+    } else {
+      var html = '';
+      s.recentMisses.slice().reverse().forEach(function(m) {
+        var t = (m.ts || '').slice(11, 16);
+        var q = (m.query || '').replace(/[<>&]/g, function(c){return ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c];});
+        html += '<div style="display:flex;gap:10px;padding:4px 0;border-bottom:1px solid var(--border);">' +
+          '<span style="color:var(--text-dim);min-width:42px;">' + t + '</span>' +
+          '<span style="color:var(--text);font-family:monospace;">' + q + '</span></div>';
+      });
+      missEl.innerHTML = html;
+    }
+  })();
+
+  // ============================================================
+  // Render: Important Topics (Row 6)
+  // ============================================================
+  (function() {
+    var topics = (window.__MEMCARE_DATA__ && window.__MEMCARE_DATA__.importantTopics) || [];
+    var el = document.getElementById('importantTopics');
+    if (!el) return;
+    if (!topics.length) {
+      el.innerHTML = '<div style="color:var(--text-dim);padding:14px 4px;">No important topics yet — nothing has scored ≥ 0.85.</div>';
+      return;
+    }
+    var catColor = {fact:'var(--accent)', decision:'var(--cyan)', preference:'var(--green)', entity:'var(--accent-light)', reflection:'var(--yellow)', other:'var(--text-dim)'};
+    function fmtAge(ts) {
+      if (!ts) return '';
+      var d = (Date.now() - ts) / 86400000;
+      if (d < 1) return Math.floor(d*24) + 'h';
+      if (d < 30) return Math.floor(d) + 'd';
+      if (d < 365) return Math.floor(d/30) + 'mo';
+      return Math.floor(d/365) + 'y';
+    }
+    function esc(s) { return String(s).replace(/[<>&]/g, function(c){return ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c];}); }
+    var html = '';
+    topics.forEach(function(t) {
+      var imp = t.importance || 0;
+      var pct = Math.round(imp * 100);
+      var color = imp >= 0.95 ? 'var(--orange)' : imp >= 0.9 ? 'var(--yellow)' : 'var(--accent)';
+      var cc = catColor[t.category] || 'var(--text-dim)';
+      var age = fmtAge(t.timestamp);
+      html += '<div style="display:flex;gap:12px;align-items:flex-start;padding:10px 6px;border-bottom:1px solid var(--border);">' +
+        '<div style="flex:0 0 56px;display:flex;flex-direction:column;align-items:center;gap:3px;">' +
+          '<div style="font-family:monospace;font-size:0.78rem;color:' + color + ';font-weight:600;">' + imp.toFixed(2) + '</div>' +
+          '<div style="width:48px;height:3px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:' + color + ';"></div></div>' +
+        '</div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="color:var(--text);word-break:break-word;">' + esc(t.text) + '</div>' +
+          '<div style="margin-top:4px;font-size:0.70rem;color:var(--text-dim);display:flex;gap:10px;flex-wrap:wrap;">' +
+            '<span style="color:' + cc + ';">' + esc(t.category || 'unknown') + '</span>' +
+            '<span>' + esc(t.scope || '') + '</span>' +
+            (age ? '<span>' + age + ' ago</span>' : '') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    });
+    el.innerHTML = html;
+  })();
+
+  // ============================================================
+  // Number animation utility
+  // ============================================================
+  function animateNumber(el, from, to, duration, suffix, doFormat) {
+    if (!el) return;
+    var start = null;
+    suffix = suffix || '';
+    function step(ts) {
+      if (!start) start = ts;
+      var progress = Math.min((ts - start) / duration, 1);
+      var eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      var current = Math.round(from + (to - from) * eased);
+      el.textContent = (doFormat ? fmt(current) : current) + suffix;
+      if (progress < 1) requestAnimationFrame(step);
+    }
+    // Delay start slightly
+    setTimeout(function() { requestAnimationFrame(step); }, 400);
+  }
+
+  // ============================================================
+  // Theme Toggle
+  // ============================================================
+  (function() {
+    var btn = document.getElementById('themeToggle');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      var current = document.documentElement.getAttribute('data-theme') || 'dark';
+      var next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('memcare-theme', next);
+    });
+  })();
+
+})();
+</script>
+
+</body>
+</html>
