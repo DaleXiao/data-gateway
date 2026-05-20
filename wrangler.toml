@@ -1,0 +1,20 @@
+name = "data-gateway"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "production"
+
+[[d1_databases]]
+binding = "DB_MEMCARE"
+database_name = "openclaw-memcare"
+database_id = "PLACEHOLDER_MEMCARE_DB_ID"
+
+[[d1_databases]]
+binding = "DB_GRAPH"
+database_name = "openclaw-graph"
+database_id = "PLACEHOLDER_GRAPH_DB_ID"
+
+[observability]
+enabled = true
