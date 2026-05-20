@@ -552,10 +552,61 @@ body {
 // === DATA (injected by build.sh) ===
 window.__MEMCARE_DATA__ = {{DATA_PLACEHOLDER}};
 
+// === SPEC-215 F-2: gateway feature flag ===
+// ?v=2 → fetch fresh data from data.openclawd.co, fallback to injected static data on any error.
+// Default (no flag / v=1) keeps the original static-data path untouched.
+window.__MEMCARE_GATEWAY_URL__ = 'https://data.openclawd.co/api/memcare/health';
+
 (function() {
   'use strict';
 
-  const RAW = window.__MEMCARE_DATA__;
+  const STATIC_RAW = window.__MEMCARE_DATA__;
+
+  // Detect ?v=2 flag
+  const params = new URLSearchParams(window.location.search);
+  const useGateway = params.get('v') === '2';
+
+  if (useGateway) {
+    // Wait for gateway fetch, then boot with whichever data succeeds.
+    bootWithGateway();
+  } else {
+    boot(STATIC_RAW);
+  }
+
+  function bootWithGateway() {
+    const timeoutMs = 5000;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+
+    fetch(window.__MEMCARE_GATEWAY_URL__, { signal: ctrl.signal, mode: 'cors' })
+      .then((r) => {
+        clearTimeout(timer);
+        if (!r.ok) throw new Error('gateway HTTP ' + r.status);
+        return r.json();
+      })
+      .then((days) => {
+        if (!Array.isArray(days) || days.length === 0) {
+          throw new Error('gateway returned empty/invalid payload');
+        }
+        // Gateway returns an array of day records (shape matches build.sh days[]).
+        // Reuse static importantTopics — gateway only serves health daily for now.
+        const merged = {
+          days: days,
+          latest: days[days.length - 1] || {},
+          importantTopics: STATIC_RAW.importantTopics || [],
+          _source: 'gateway'
+        };
+        console.info('[memcare] data source: gateway (v=2)');
+        boot(merged);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        console.warn('[memcare] gateway fetch failed, falling back to static:', err && err.message);
+        boot(Object.assign({}, STATIC_RAW, { _source: 'static-fallback' }));
+      });
+  }
+
+  function boot(RAW) {
   // DATA has shape {days:[...], latest:{...}}
   const allDays = (RAW.days || []).sort((a, b) => (a.date||'').localeCompare(b.date||''));
   const latest = RAW.latest && RAW.latest.date ? RAW.latest : allDays[allDays.length - 1] || {};
@@ -1237,6 +1288,7 @@ window.__MEMCARE_DATA__ = {{DATA_PLACEHOLDER}};
     });
   })();
 
+  } // end boot()
 })();
 </script>
 
